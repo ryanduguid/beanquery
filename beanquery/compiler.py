@@ -1,4 +1,5 @@
 import collections.abc
+import datetime
 import importlib
 import typing
 
@@ -168,40 +169,43 @@ class Compiler:
             return None
 
         # Table reference.
+        c_expression = None
         if isinstance(node, ast.Table):
             self.table = self.context.tables.get(node.name)
             if self.table is None:
                 raise CompilationError(f'table "{node.name}" does not exist', node)
-            return None
 
         # FROM expression.
-        if isinstance(node, ast.From):
-            # Check if the FROM expression is a column name belongin to the current table.
-            if isinstance(node.expression, ast.Column):
-                column = self.table.columns.get(node.expression.name)
+        elif isinstance(node, ast.From):
+            expression = node.expression
+            # Prefer a column in the current table over a bare table name.
+            if isinstance(expression, ast.Column):
+                column = self.table.columns.get(expression.name)
                 if column is None:
-                    # When it is not, threat it as a table name.
-                    table = self.context.tables.get(node.expression.name)
+                    table = self.context.tables.get(expression.name)
                     if table is not None:
                         self.table = table
-                        return None
+                        expression = None
 
-            c_expression = self._compile(node.expression)
+            c_expression = self._compile(expression)
 
             # Check that the FROM clause does not contain aggregates.
             if c_expression is not None and is_aggregate(c_expression):
                 raise CompilationError('aggregates are not allowed in FROM clause')
 
-            if node.open and node.close and node.open > node.close:
-                raise CompilationError('CLOSE date must follow OPEN date')
+        else:
+            raise NotImplementedError
 
-            # Apply OPEN, CLOSE, and CLEAR clauses.
-            if node.open is not None or node.close is not None or node.clear is not None:
-                self.table = self.table.evolve(open=node.open, close=node.close, clear=node.clear)
+        if node.open and isinstance(node.close, datetime.date) and node.open > node.close:
+            raise CompilationError('CLOSE date must follow OPEN date', node)
 
-            return c_expression
+        # Apply OPEN, CLOSE, and CLEAR clauses.
+        if node.open is not None or node.close is not None or node.clear is not None:
+            if not hasattr(self.table, 'evolve'):
+                raise CompilationError(f'table "{self.table.name}" does not support OPEN, CLOSE, or CLEAR', node)
+            self.table = self.table.evolve(open=node.open, close=node.close, clear=node.clear)
 
-        raise NotImplementedError
+        return c_expression
 
     def _compile_targets(self, targets):
         """Compile the targets and check for their validity. Process wildcard.

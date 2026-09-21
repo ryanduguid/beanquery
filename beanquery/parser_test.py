@@ -208,6 +208,27 @@ class TestSelectPrecedence(QueryParserTestBase):
 
 class TestSelectFrom(QueryParserTestBase):
 
+    def test_table_periods(self):
+        start = datetime.date(2025, 7, 1)
+        end = datetime.date(2026, 7, 1)
+        for table in ('#postings', '"postings"'):
+            for clause, kwargs in (
+                    ('', {}),
+                    ('OPEN ON 2025-07-01', {'open': start}),
+                    ('CLOSE', {'close': True}),
+                    ('CLOSE ON 2026-07-01', {'close': end}),
+                    ('CLEAR', {'clear': True}),
+                    ('OPEN ON 2025-07-01 CLOSE CLEAR', {'open': start, 'close': True, 'clear': True}),
+                    ('OPEN ON 2025-07-01 CLOSE ON 2026-07-01 CLEAR',
+                     {'open': start, 'close': end, 'clear': True})):
+                with self.subTest(table=table, clause=clause):
+                    self.assertParseFrom(f'SELECT * FROM {table} {clause}', ast.Table('postings', **kwargs))
+
+    def test_table_invalid_periods(self):
+        for clause in ('OPEN', 'OPEN 2025-07-01', 'CLOSE ON', 'CLEAR OPEN ON 2025-07-01'):
+            with self.subTest(clause=clause), self.assertRaises(parser.ParseError):
+                self.parse(f'SELECT * FROM #postings {clause}')
+
     def test_select_from(self):
         expr = ast.Equal(ast.Column('d'), ast.And([ast.Function('max', [ast.Column('e')]), ast.Constant(17)]))
 

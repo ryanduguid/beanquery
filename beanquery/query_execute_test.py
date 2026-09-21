@@ -90,6 +90,99 @@ class CommonInputBase(unittest.TestCase):
     """)
 
 
+class TestTablePeriods(QueryBase):
+    INPUT = '''
+        2025-06-01 open Assets:Bank AUD
+        2025-06-01 open Equity:Opening AUD
+        2025-06-01 open Expenses:Food AUD
+        2025-06-01 open Income:Interest AUD
+
+        2025-06-01 * "Opening funds"
+          Assets:Bank  1000 AUD
+          Equity:Opening
+
+        2025-06-30 * "Prior-year groceries"
+          Expenses:Food  100 AUD
+          Assets:Bank
+
+        2025-06-30 * "Prior-year interest"
+          Assets:Bank  50 AUD
+          Income:Interest
+
+        2025-07-01 * "Boundary groceries"
+          Expenses:Food  10 AUD
+          Assets:Bank
+
+        2025-07-02 * "Later groceries"
+          Expenses:Food  20 AUD
+          Assets:Bank
+    '''
+
+    def test_postings_periods(self):
+        for table in ('#postings', '"postings"', 'postings'):
+            for clause, expense in (
+                    ('OPEN ON 2025-07-01', 30),
+                    ('CLOSE ON 2025-07-01', 100),
+                    ('CLOSE', 130),
+                    ('CLEAR', 0),
+                    ('OPEN ON 2025-07-01 CLOSE ON 2025-07-02', 10),
+                    ('OPEN ON 2025-07-01 CLOSE CLEAR', 0),
+                    ('OPEN ON 2025-07-01 CLOSE ON 2025-07-02 CLEAR', 0)):
+                with self.subTest(table=table, clause=clause):
+                    self.assertResult(
+                        f"SELECT sum(number) FROM {table} {clause} WHERE account = 'Expenses:Food'",
+                        D(expense))
+                    expected = self.ctx.execute(f'SELECT date, flag, account, position FROM {clause}').fetchall()
+                    actual = self.ctx.execute(f'SELECT date, flag, account, position FROM {table} {clause}').fetchall()
+                    self.assertEqual(actual, expected)
+                    self.assertResult("SELECT sum(number) WHERE account = 'Expenses:Food'", D(130))
+
+    def test_entries_periods(self):
+        for table in ('#entries', '"entries"', 'entries'):
+            for clause in ('OPEN ON 2025-07-01', 'CLOSE ON 2025-07-01', 'CLOSE', 'CLEAR',
+                           'OPEN ON 2025-07-01 CLOSE CLEAR',
+                           'OPEN ON 2025-07-01 CLOSE ON 2025-07-02 CLEAR'):
+                with self.subTest(table=table, clause=clause):
+                    self.ctx.tables[None] = self.ctx.tables['entries']
+                    expected = self.ctx.execute(f'SELECT id, date, type FROM {clause}').fetchall()
+                    self.ctx.tables[None] = self.ctx.tables['postings']
+                    actual = self.ctx.execute(f'SELECT id, date, type FROM {table} {clause}').fetchall()
+                    self.assertEqual(actual, expected)
+                    self.assertResult('SELECT count(*) FROM #entries', 9)
+                    self.assertResult('SELECT count(*)', 10)
+
+    def test_invalid_period_dates(self):
+        for table in ('', '#postings', 'postings', '#entries', 'entries'):
+            with self.subTest(table=table), self.assertRaisesRegex(CompilationError, 'CLOSE date must follow OPEN date'):
+                self.ctx.execute(f'SELECT date FROM {table} OPEN ON 2025-07-02 CLOSE ON 2025-07-01')
+
+    def test_equal_period_dates(self):
+        for table in ('#postings', 'postings'):
+            with self.subTest(table=table):
+                rows = self.ctx.execute(
+                    f"SELECT account FROM {table} OPEN ON 2025-07-01 CLOSE ON 2025-07-01 WHERE flag = '*'"
+                ).fetchall()
+                self.assertEqual(rows, [])
+
+    def test_unsupported_table_periods(self):
+        self.ctx.execute('CREATE TABLE external (value int)')
+        for table in ('#transactions', 'transactions', '#accounts', '#', '#external', 'external'):
+            for clause in ('OPEN ON 2025-07-01', 'CLOSE', 'CLEAR'):
+                with self.subTest(table=table, clause=clause):
+                    with self.assertRaisesRegex(CompilationError, 'does not support OPEN, CLOSE, or CLEAR'):
+                        self.ctx.execute(f'SELECT count(*) FROM {table} {clause}')
+
+    def test_missing_table_periods(self):
+        with self.assertRaisesRegex(CompilationError, 'table "missing" does not exist'):
+            self.ctx.execute('SELECT count(*) FROM #missing CLEAR')
+
+    def test_column_precedes_bare_table_name(self):
+        self.ctx.tables['account'] = tables.NullTable()
+        expected = self.ctx.execute('SELECT account FROM OPEN ON 2025-07-01').fetchall()
+        actual = self.ctx.execute('SELECT account FROM account OPEN ON 2025-07-01').fetchall()
+        self.assertEqual(actual, expected)
+
+
 class TestFundamentals(QueryBase):
     INPUT = textwrap.dedent("""
           2022-04-05 commodity TEST

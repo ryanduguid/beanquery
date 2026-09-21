@@ -178,7 +178,13 @@ PivotBy = node('PivotBy', 'columns')
 #
 # Attributes:
 #   name: The table name.
-Table = node('Table', 'name')
+@dataclasses.dataclass(**({'slots': True} if sys.version_info[:2] >= (3, 10) else {}))
+class Table(Node):
+    name: str
+    open: Optional[datetime.date] = None
+    close: Optional[Union[datetime.date, bool]] = None
+    clear: Optional[bool] = None
+    parseinfo: Any = dataclasses.field(default=None, compare=False, repr=False)
 
 # A reference to a column.
 #

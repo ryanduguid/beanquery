@@ -25,34 +25,34 @@ from tatsu.util import re, generic_main
 
 
 KEYWORDS: set[str] = {
-    'USING',
-    'GROUP',
-    'INSERT',
-    'AND',
-    'WHERE',
-    'SELECT',
-    'FROM',
-    'DISTINCT',
-    'BALANCES',
     'ORDER',
-    'PRINT',
-    'DESC',
-    'INTO',
-    'IN',
-    'CREATE',
-    'OR',
-    'BY',
-    'LIMIT',
-    'FALSE',
-    'AS',
-    'HAVING',
-    'ASC',
-    'IS',
-    'TABLE',
-    'NOT',
-    'TRUE',
-    'PIVOT',
+    'BALANCES',
     'JOURNAL',
+    'OR',
+    'AND',
+    'IS',
+    'BY',
+    'AS',
+    'DISTINCT',
+    'PRINT',
+    'SELECT',
+    'CREATE',
+    'FROM',
+    'WHERE',
+    'HAVING',
+    'TRUE',
+    'GROUP',
+    'LIMIT',
+    'INSERT',
+    'PIVOT',
+    'IN',
+    'DESC',
+    'FALSE',
+    'USING',
+    'INTO',
+    'ASC',
+    'NOT',
+    'TABLE',
 }
 
 
@@ -316,19 +316,50 @@ class BQLParser(Parser):
 
     @tatsumasu('Table')
     def __table_(self):
-        with self._choice():
-            with self._option():
-                self._pattern('#([a-zA-Z_][a-zA-Z0-9_]*)?')
-                self.name_last_node('name')
-            with self._option():
-                self._quoted_identifier_()
-                self.name_last_node('name')
-            self._error(
-                'expecting one of: '
-                '#([a-zA-Z_][a-zA-Z0-9_]*)?'
-                '<quoted_identifier>'
-                '\\"((?:[^\\"]|\\"\\")+)\\"'
-            )
+        with self._group():
+            with self._choice():
+                with self._option():
+                    self._pattern('#([a-zA-Z_][a-zA-Z0-9_]*)?')
+                    self.name_last_node('name')
+                with self._option():
+                    self._quoted_identifier_()
+                    self.name_last_node('name')
+                self._error(
+                    'expecting one of: '
+                    '#([a-zA-Z_][a-zA-Z0-9_]*)?'
+                    '<quoted_identifier>'
+                )
+        with self._optional():
+            self._token('OPEN')
+            self._token('ON')
+            self._date_()
+            self.name_last_node('open')
+            self._define(['open'], [])
+        with self._optional():
+            self._token('CLOSE')
+            with self._group():
+                with self._choice():
+                    with self._option():
+                        self._token('ON')
+                        self._date_()
+                        self.name_last_node('close')
+                        self._define(['close'], [])
+                    with self._option():
+                        self._empty_closure()
+                        self._constant(True)
+                        self.name_last_node('close')
+                        self._define(['close'], [])
+                    self._error(
+                        'expecting one of: '
+                        "'ON'"
+                    )
+            self._define(['close'], [])
+        with self._optional():
+            self._token('CLEAR')
+            self._constant(True)
+            self.name_last_node('clear')
+            self._define(['clear'], [])
+        self._define(['clear', 'close', 'name', 'open'], [])
 
     @tatsumasu('Table')
     def _table_(self):
