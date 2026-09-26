@@ -316,6 +316,17 @@ class TestCommands(unittest.TestCase):
 
 class TestHelp(unittest.TestCase):
 
+    def test_coalesce(self):
+        for topic in ('targets', 'from', 'where'):
+            with self.subTest(topic=topic):
+                out, err = run_shell_command('.help ' + topic)
+                self.assertEqual(err, '')
+                self.assertEqual(out.count('coalesce(expr, ...)'), 1)
+                self.assertIn('first non-NULL argument', out)
+                self.assertIn('Arguments must have the same type.', out)
+                if topic == 'targets':
+                    self.assertNotIn('coalesce', out.split('Aggregate functions')[1])
+
     def test_help_functions(self):
         for name in dir(shell.BQLShell):
             if name.startswith('help_'):

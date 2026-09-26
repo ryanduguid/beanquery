@@ -705,6 +705,12 @@ def _describe_columns(columns):
 
 def _describe_functions(functions, aggregates=False):
     entries = []
+    if not aggregates:
+        entries.append((
+            'coalesce',
+            'Return the first non-NULL argument, or NULL if all arguments are NULL. '
+            'Arguments must have the same type.',
+            'expr, ...'))
     for name, funcs in functions.items():
         if aggregates != issubclass(funcs[0], query_compile.EvalAggregator):
             continue
