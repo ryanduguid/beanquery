@@ -1,3 +1,4 @@
+import io
 import unittest
 import sqlite3
 
@@ -10,6 +11,13 @@ class TestPublicAPI(unittest.TestCase):
         namespace = {}
         exec('from beanquery import *', namespace)
         self.assertIs(namespace['connect'], beanquery.connect)
+
+    def test_close_releases_csv_stream(self):
+        data = io.StringIO('amount\n100\n')
+        connection = beanquery.connect('csv:', data=data)
+        connection.close()
+        self.assertTrue(data.closed)
+        connection.close()
 
 
 class APITests:

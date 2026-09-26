@@ -80,6 +80,9 @@ class Table(tables.Table):
             self.columns[cname] = Column(len(self.columns), ctype, converter)
 
     def __del__(self):
+        self.close()
+
+    def close(self):
         self.data.close()
 
     def __iter__(self):

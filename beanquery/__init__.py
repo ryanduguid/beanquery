@@ -51,7 +51,8 @@ class Connection:
 
     def close(self):
         # Required by the DB-API.
-        pass
+        for table in self.tables.values():
+            table.close()
 
     def parse(self, query):
         return parser.parse(query)

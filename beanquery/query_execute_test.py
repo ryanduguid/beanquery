@@ -6,6 +6,7 @@ import io
 import unittest
 import textwrap
 
+from contextlib import closing
 from decimal import Decimal
 from dateutil.relativedelta import relativedelta
 
@@ -1831,14 +1832,15 @@ class TestCSVTable(unittest.TestCase):
         1234, 1, baz, 2025-01-01
         5678, 0, qux, 2025-01-02
         '''
-        using = f'csv:{filename}'
-        curs = self.conn.execute(f'''CREATE TABLE test (a int, b bool, c str, d date) USING {using!r}''')
-        self.assertEqual(curs.fetchall(), [])
-        curs = self.conn.execute('''SELECT * FROM test''')
-        self.assertEqual(curs.fetchone(), (1234, True, 'baz', datetime.date(2025, 1, 1)))
-        self.assertEqual(curs.fetchone(), (5678, False, 'qux', datetime.date(2025, 1, 2)))
-        curs = self.conn.execute('''SELECT * FROM test''')
-        self.assertEqual(len(curs.fetchall()), 2)
+        with closing(self.conn):
+            using = f'csv:{filename}'
+            curs = self.conn.execute(f'''CREATE TABLE test (a int, b bool, c str, d date) USING {using!r}''')
+            self.assertEqual(curs.fetchall(), [])
+            curs = self.conn.execute('''SELECT * FROM test''')
+            self.assertEqual(curs.fetchone(), (1234, True, 'baz', datetime.date(2025, 1, 1)))
+            self.assertEqual(curs.fetchone(), (5678, False, 'qux', datetime.date(2025, 1, 2)))
+            curs = self.conn.execute('''SELECT * FROM test''')
+            self.assertEqual(len(curs.fetchall()), 2)
 
     @docfile
     def test_create_table_header(self, filename):
@@ -1847,11 +1849,12 @@ class TestCSVTable(unittest.TestCase):
         1234
         5678
         '''
-        using = f'csv:{filename}?header=1'
-        curs = self.conn.execute(f'''CREATE TABLE test (a int) USING {using!r}''')
-        self.assertEqual(curs.fetchall(), [])
-        curs = self.conn.execute('''SELECT * FROM test''')
-        self.assertEqual(len(curs.fetchall()), 2)
+        with closing(self.conn):
+            using = f'csv:{filename}?header=1'
+            curs = self.conn.execute(f'''CREATE TABLE test (a int) USING {using!r}''')
+            self.assertEqual(curs.fetchall(), [])
+            curs = self.conn.execute('''SELECT * FROM test''')
+            self.assertEqual(len(curs.fetchall()), 2)
 
     @docfile
     def test_create_table_guess_types(self, filename):
@@ -1860,13 +1863,14 @@ class TestCSVTable(unittest.TestCase):
         1234, one, true, 2025-01-01, 1.234
         5678, two, false, 2025-01-02, 5.678
         '''
-        using = f'csv:{filename}'
-        curs = self.conn.execute(f'''CREATE TABLE test USING {using!r}''')
-        self.assertEqual(curs.fetchall(), [])
-        names = list(self.conn.tables['test'].columns.keys())
-        self.assertEqual(names, ['id', 'name', 'check', 'date', 'value'])
-        types = [column.dtype for column in self.conn.tables['test'].columns.values()]
-        self.assertEqual(types, [int, str, bool, datetime.date, Decimal])
+        with closing(self.conn):
+            using = f'csv:{filename}'
+            curs = self.conn.execute(f'''CREATE TABLE test USING {using!r}''')
+            self.assertEqual(curs.fetchall(), [])
+            names = list(self.conn.tables['test'].columns.keys())
+            self.assertEqual(names, ['id', 'name', 'check', 'date', 'value'])
+            types = [column.dtype for column in self.conn.tables['test'].columns.values()]
+            self.assertEqual(types, [int, str, bool, datetime.date, Decimal])
 
 
 class TestCSVSource(unittest.TestCase):
@@ -1902,7 +1906,8 @@ class TestCSVSource(unittest.TestCase):
         1234, one, true, 2025-01-01, 1.234
         '''
         conn = beanquery.connect(f'csv:{filename}?name=test')
-        names = list(conn.tables['test'].columns.keys())
-        self.assertEqual(names, ['id', 'name', 'check', 'date', 'value'])
-        types = [column.dtype for column in conn.tables['test'].columns.values()]
-        self.assertEqual(types, [int, str, bool, datetime.date, Decimal])
+        with closing(conn):
+            names = list(conn.tables['test'].columns.keys())
+            self.assertEqual(names, ['id', 'name', 'check', 'date', 'value'])
+            types = [column.dtype for column in conn.tables['test'].columns.values()]
+            self.assertEqual(types, [int, str, bool, datetime.date, Decimal])

@@ -5,6 +5,9 @@ class Table:
     def __getitem__(self, name):
         return self.columns[name]
 
+    def close(self):
+        """Release resources owned by this table."""
+
     @property
     def wildcard_columns(self):
         # For backward compatibility. Remove once the postings table

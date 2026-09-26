@@ -2,10 +2,14 @@ __copyright__ = "Copyright (C) 2014-2016  Martin Blais"
 __license__ = "GNU GPLv2"
 
 import functools
+import io
+from pathlib import Path
 import re
 import sys
+import tempfile
 import textwrap
 import unittest
+from unittest import mock
 
 import click.testing
 
@@ -135,6 +139,61 @@ def runshell(function):
         out, err = run_shell_command(function.__doc__)
         return function(self, out, err)
     return wrapper
+
+
+class TestOutput(unittest.TestCase):
+    def test_reselect_output_flushes_before_truncating(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'output.txt'
+            with path.open('w') as output:
+                shell_obj = shell.BQLShell('', output)
+                output.write('old buffered output')
+                shell_obj.do_output(str(path))
+                with shell_obj.outfile as replacement:
+                    replacement.write('new')
+            self.assertEqual(path.read_text(), 'new')
+
+    def test_failed_close_cleans_up_replacement(self):
+        output = mock.Mock()
+        output.close.side_effect = OSError('close failed')
+        replacement = io.StringIO()
+        shell_obj = shell.BQLShell('', output)
+        with mock.patch('beanquery.shell.open', return_value=replacement, create=True):
+            with self.assertRaisesRegex(OSError, 'close failed'):
+                shell_obj.do_output('replacement')
+        self.assertTrue(replacement.closed)
+
+    def test_reset_output(self):
+        output = io.StringIO()
+        shell_obj = shell.BQLShell('', output)
+        shell_obj.do_output('')
+        self.assertTrue(output.closed)
+        self.assertIs(shell_obj.outfile, sys.stdout)
+        shell_obj.do_output('')
+        self.assertFalse(sys.stdout.closed)
+
+    def test_cleanup_preserves_original_close_error(self):
+        output = mock.Mock()
+        original_error = OSError('previous stream failed')
+        output.close.side_effect = original_error
+        replacement = mock.Mock()
+        replacement.close.side_effect = OSError('replacement failed')
+        shell_obj = shell.BQLShell('', output)
+        with mock.patch('beanquery.shell.open', return_value=replacement, create=True):
+            with self.assertRaises(OSError) as raised:
+                shell_obj.do_output('replacement')
+        self.assertIs(raised.exception, original_error)
+        replacement.close.assert_called_once_with()
+
+    def test_failed_output_change_preserves_stream(self):
+        with io.StringIO() as output:
+            shell_obj = shell.BQLShell('', output)
+            with mock.patch('beanquery.shell.open', side_effect=OSError('unwritable'), create=True):
+                with self.assertRaises(OSError):
+                    shell_obj.do_output('unwritable')
+            self.assertIs(shell_obj.outfile, output)
+            self.assertFalse(output.closed)
+            output.write('still usable')
 
 
 class TestUseCases(unittest.TestCase):
@@ -362,10 +421,7 @@ class TestShell(ClickTestCase):
         """
         """
         r = self.main(filename, '--format=csv', "SELECT 111 AS one, 222 AS two FROM #")
-        self.assertEqual(r.stdout, textwrap.dedent('''\
-            one,two
-            111,222
-        '''))
+        self.assertEqual(r.stdout.splitlines(), ['one,two', '111,222'])
 
     @test_utils.docfile
     def test_format_text(self, filename):

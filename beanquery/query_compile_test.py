@@ -281,7 +281,7 @@ class TestCompileSelect(CompileSelectBase):
         # Test the compilation of from.
 
         query = self.compile("SELECT account FROM CLOSE;")
-        self.assertEqual(query.table.close, True)
+        self.assertEqual(query.table._close, True)
 
         query = self.compile("SELECT account FROM length(payee) != 0;")
         self.assertTrue(isinstance(query.c_where, qc.EvalNode))
