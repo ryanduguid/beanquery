@@ -249,13 +249,13 @@ class _BeancountTable(tables.Table):
         self.entries = entries
         self.options = options
         self.open = open
-        self.close = close
+        self._close = close
         self.clear = clear
 
     def evolve(self, **kwargs):
         table = copy.copy(self)
         for name, value in kwargs.items():
-            setattr(table, name, value)
+            setattr(table, '_close' if name == 'close' else name, value)
         return table
 
     def prepare(self):
@@ -268,10 +268,10 @@ class _BeancountTable(tables.Table):
             entries, index = summarize.open_opt(entries, self.open, options)
 
         # Process the CLOSE clause.
-        if self.close is not None:
-            if isinstance(self.close, datetime.date):
-                entries, index = summarize.close_opt(entries, self.close, options)
-            elif self.close is True:
+        if self._close is not None:
+            if isinstance(self._close, datetime.date):
+                entries, index = summarize.close_opt(entries, self._close, options)
+            elif self._close is True:
                 entries, index = summarize.close_opt(entries, None, options)
 
         # Process the CLEAR clause.

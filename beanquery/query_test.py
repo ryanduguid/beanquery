@@ -4,10 +4,18 @@ __license__ = "GNU GPLv2"
 import unittest
 
 from beancount import loader
+import beanquery
 from beanquery import query
 
 
 class TestSimple(unittest.TestCase):
+
+    def test_close_beancount_connection(self):
+        entries, errors, options = loader.load_string('2022-01-01 open Assets:Checking USD')
+        connection = beanquery.connect('beancount:', entries=entries, errors=errors, options=options)
+        connection.execute('SELECT account FROM CLOSE').fetchall()
+        connection.close()
+        connection.close()
 
     @loader.load_doc()
     def test_run_query(self, entries, _, options):

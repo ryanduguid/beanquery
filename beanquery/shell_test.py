@@ -3,8 +3,10 @@ __license__ = "GNU GPLv2"
 
 import functools
 import io
+from pathlib import Path
 import re
 import sys
+import tempfile
 import textwrap
 import unittest
 from unittest import mock
@@ -140,6 +142,27 @@ def runshell(function):
 
 
 class TestOutput(unittest.TestCase):
+    def test_reselect_output_flushes_before_truncating(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'output.txt'
+            with path.open('w') as output:
+                shell_obj = shell.BQLShell('', output)
+                output.write('old buffered output')
+                shell_obj.do_output(str(path))
+                with shell_obj.outfile as replacement:
+                    replacement.write('new')
+            self.assertEqual(path.read_text(), 'new')
+
+    def test_failed_close_cleans_up_replacement(self):
+        output = mock.Mock()
+        output.close.side_effect = OSError('close failed')
+        replacement = io.StringIO()
+        shell_obj = shell.BQLShell('', output)
+        with mock.patch('beanquery.shell.open', return_value=replacement, create=True):
+            with self.assertRaisesRegex(OSError, 'close failed'):
+                shell_obj.do_output('replacement')
+        self.assertTrue(replacement.closed)
+
     def test_reset_output(self):
         output = io.StringIO()
         shell_obj = shell.BQLShell('', output)
