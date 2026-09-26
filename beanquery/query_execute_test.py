@@ -2,6 +2,7 @@ __copyright__ = "Copyright (C) 2014-2017  Martin Blais"
 __license__ = "GNU GPLv2"
 
 import datetime
+import io
 import unittest
 import textwrap
 
@@ -1869,6 +1870,30 @@ class TestCSVTable(unittest.TestCase):
 
 
 class TestCSVSource(unittest.TestCase):
+
+    def test_duplicate_column_names(self):
+        data = io.StringIO('amount,amount,balance\n100,900,1000\n')
+        with self.assertRaisesRegex(ValueError, "Duplicate column name: 'amount'"):
+            beanquery.connect('csv:', data=data)
+
+    def test_first_row_width(self):
+        for row in ('100', '100,900,1000'):
+            with self.subTest(row=row):
+                data = io.StringIO(f'amount,balance\n{row}\n')
+                with self.assertRaisesRegex(ValueError, 'CSV header and first row have different lengths'):
+                    beanquery.connect('csv:', data=data)
+
+    def test_header_without_rows(self):
+        conn = beanquery.connect('csv:', data=io.StringIO('amount,balance\n'))
+        cursor = conn.execute('SELECT amount, balance FROM csv')
+        self.assertEqual([(column.name, column.datatype) for column in cursor.description],
+                         [('amount', str), ('balance', str)])
+        self.assertEqual(cursor.fetchall(), [])
+
+    def test_empty_file(self):
+        conn = beanquery.connect('csv:', data=io.StringIO(''))
+        self.assertEqual(conn.tables['csv'].columns, {})
+        self.assertEqual(conn.execute('SELECT * FROM csv').fetchall(), [])
 
     @docfile
     def test_csv_source(self, filename):

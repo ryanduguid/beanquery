@@ -68,10 +68,14 @@ class Table(tables.Table):
         self.columns = {}
         if columns is None:
             names = next(self.reader, [])
-            values = next(self.reader, [])
-            datatypes = (_guess_type(value) for value in values)
+            values = next(self.reader, None)
+            if values is not None and len(names) != len(values):
+                raise ValueError('CSV header and first row have different lengths')
+            datatypes = (_guess_type(value) for value in values) if values is not None else (str for _ in names)
             columns = zip(names, datatypes)
         for cname, ctype in columns:
+            if cname in self.columns:
+                raise ValueError(f'Duplicate column name: {cname!r}')
             converter = _TYPES_TO_PARSERS.get(ctype, ctype)
             self.columns[cname] = Column(len(self.columns), ctype, converter)
 
@@ -82,7 +86,7 @@ class Table(tables.Table):
         self.data.seek(0)
         it = iter(self.reader)
         if self.header:
-            next(it)
+            next(it, None)
         return it
 
 
