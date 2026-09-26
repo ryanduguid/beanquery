@@ -172,6 +172,19 @@ class TestOutput(unittest.TestCase):
         shell_obj.do_output('')
         self.assertFalse(sys.stdout.closed)
 
+    def test_cleanup_preserves_original_close_error(self):
+        output = mock.Mock()
+        original_error = OSError('previous stream failed')
+        output.close.side_effect = original_error
+        replacement = mock.Mock()
+        replacement.close.side_effect = OSError('replacement failed')
+        shell_obj = shell.BQLShell('', output)
+        with mock.patch('beanquery.shell.open', return_value=replacement, create=True):
+            with self.assertRaises(OSError) as raised:
+                shell_obj.do_output('replacement')
+        self.assertIs(raised.exception, original_error)
+        replacement.close.assert_called_once_with()
+
     def test_failed_output_change_preserves_stream(self):
         with io.StringIO() as output:
             shell_obj = shell.BQLShell('', output)

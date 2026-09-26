@@ -352,10 +352,12 @@ class DispatchingShell(cmd.Cmd):
         try:
             if self.outfile is not sys.stdout:
                 self.outfile.close()
-        except BaseException:
-            if output is not sys.stdout:
-                output.close()
-            raise
+        except BaseException as error:
+            try:
+                if output is not sys.stdout:
+                    output.close()
+            finally:
+                raise error
         self.outfile = output
 
     def do_parse(self, arg):
