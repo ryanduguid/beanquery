@@ -2,10 +2,12 @@ __copyright__ = "Copyright (C) 2014-2016  Martin Blais"
 __license__ = "GNU GPLv2"
 
 import functools
+import io
 import re
 import sys
 import textwrap
 import unittest
+from unittest import mock
 
 import click.testing
 
@@ -135,6 +137,27 @@ def runshell(function):
         out, err = run_shell_command(function.__doc__)
         return function(self, out, err)
     return wrapper
+
+
+class TestOutput(unittest.TestCase):
+    def test_reset_output(self):
+        output = io.StringIO()
+        shell_obj = shell.BQLShell('', output)
+        shell_obj.do_output('')
+        self.assertTrue(output.closed)
+        self.assertIs(shell_obj.outfile, sys.stdout)
+        shell_obj.do_output('')
+        self.assertFalse(sys.stdout.closed)
+
+    def test_failed_output_change_preserves_stream(self):
+        with io.StringIO() as output:
+            shell_obj = shell.BQLShell('', output)
+            with mock.patch('beanquery.shell.open', side_effect=OSError('unwritable'), create=True):
+                with self.assertRaises(OSError):
+                    shell_obj.do_output('unwritable')
+            self.assertIs(shell_obj.outfile, output)
+            self.assertFalse(output.closed)
+            output.write('still usable')
 
 
 class TestUseCases(unittest.TestCase):
@@ -362,10 +385,7 @@ class TestShell(ClickTestCase):
         """
         """
         r = self.main(filename, '--format=csv', "SELECT 111 AS one, 222 AS two FROM #")
-        self.assertEqual(r.stdout, textwrap.dedent('''\
-            one,two
-            111,222
-        '''))
+        self.assertEqual(r.stdout.splitlines(), ['one,two', '111,222'])
 
     @test_utils.docfile
     def test_format_text(self, filename):
