@@ -78,6 +78,7 @@ ignore = [
     'PLR0912',
     'PLR0913',
     'PLR0915',
+    'PLR0917', # Preserve the existing positional APIs, as with PLR0913.
     'PLR1714',
     'PLR2004',
     'PLW1641', # eq-without-hash

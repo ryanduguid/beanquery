@@ -5,6 +5,13 @@ import beanquery
 from beanquery.sources import test
 
 
+class TestPublicAPI(unittest.TestCase):
+    def test_import_all(self):
+        namespace = {}
+        exec('from beanquery import *', namespace)
+        self.assertIs(namespace['connect'], beanquery.connect)
+
+
 class APITests:
     def test_description(self):
         curs = self.conn.cursor()

@@ -83,7 +83,7 @@ __all__ = [
     'ProgrammingError',
     'Warning',
     'apilevel',
-    'connet',
+    'connect',
     'paramstyle',
     'threadsafety',
 ]
