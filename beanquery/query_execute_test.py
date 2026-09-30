@@ -1227,6 +1227,38 @@ class TestExecuteOptions(QueryBase):
                 ('Equity:Rest',),
                 ])
 
+    def test_distinct_sets(self):
+        entries, errors, options = loader.load_string(textwrap.dedent('''
+            2026-01-01 open Assets:Test
+            2026-01-01 open Equity:Test
+            2026-01-02 * "First" #one #two ^one ^two
+              Assets:Test 1 AUD
+              Equity:Test -1 AUD
+            2026-01-03 * "Repeated" #two #one ^two ^one
+              Assets:Test 2 AUD
+              Equity:Test -2 AUD
+            2026-01-04 * "Empty"
+              Assets:Test 3 AUD
+              Equity:Test -3 AUD
+        '''))
+        self.assertFalse(errors)
+        entries[3] = entries[3]._replace(tags=frozenset(['one', 'two']), links=frozenset(['one', 'two']))
+        ctx = beanquery.connect('beancount:', entries=entries, errors=errors, options=options)
+        for column in ('tags', 'links'):
+            self.assertEqual(getattr(entries[2], column), getattr(entries[3], column))
+            self.assertIsNot(getattr(entries[2], column), getattr(entries[3], column))
+            for table in ('postings', 'entries'):
+                with self.subTest(column=column, table=table):
+                    curs = ctx.execute(f'SELECT DISTINCT {column} FROM #{table}')
+                    self.assertEqual(curs.description, ((column, set),))
+                    expected = [(getattr(entries[2], column),), (getattr(entries[4], column),)]
+                    if table == 'entries':
+                        expected.insert(0, (None,))
+                    rows = curs.fetchall()
+                    self.assertEqual(rows, expected)
+                    for row, original in zip(rows, expected):
+                        self.assertIs(row[0], original[0])
+
     def test_limit(self):
         self.check_query(
             self.INPUT,

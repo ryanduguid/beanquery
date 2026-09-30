@@ -30,6 +30,52 @@ class TestHashable(unittest.TestCase):
         d = hash(wrap(objd))
         self.assertNotEqual(a, d)
 
+    def test_set(self):
+        wrap = hashable.make((Column('tags', set),))
+        for obj in ((frozenset(),), (frozenset({'one', 'two'}),)):
+            with self.subTest(obj=obj):
+                self.assertEqual(wrap(obj), obj)
+                self.assertEqual(hash(wrap(obj)), hash(obj))
+
+    def test_set_iteration_order(self):
+        class OrderedSet(set):
+            def __init__(self, values):
+                super().__init__(values)
+                self.order = values
+
+            def __iter__(self):
+                return iter(self.order)
+
+        wrap = hashable.make((Column('flag', bool), Column('tags', set)))
+        a = wrap((True, OrderedSet((1, 2))))
+        b = wrap((True, OrderedSet((2, 1))))
+        self.assertEqual(a, b)
+        self.assertEqual(hash(a), hash(b))
+        self.assertEqual(len({a, b}), 1)
+
+    def test_dict_insertion_order(self):
+        wrap = hashable.make((Column('meta', dict),))
+        a = wrap(({'one': 1, 'two': 2},))
+        b = wrap(({'two': 2, 'one': 1},))
+        self.assertEqual(a, b)
+        self.assertEqual(hash(a), hash(b))
+        self.assertEqual(len({a, b}), 1)
+        self.assertNotEqual(a, wrap(({'one': 2, 'two': 1},)))
+
+    def test_nullable_containers(self):
+        for dtype in (set, dict):
+            with self.subTest(dtype=dtype):
+                wrap = hashable.make((Column('value', dtype),))
+                self.assertEqual(wrap((None,)), (None,))
+                self.assertEqual(hash(wrap((None,))), hash((None,)))
+                self.assertNotEqual(wrap((None,)), wrap((dtype(),)))
+
+    def test_set_with_other_columns(self):
+        wrap = hashable.make((Column('flag', bool), Column('tags', set)))
+        obj = (True, frozenset({'one', 'two'}))
+        self.assertEqual(wrap(obj), obj)
+        self.assertEqual(hash(wrap(obj)), hash(obj))
+
     def test_registered(self):
 
         @dataclasses.dataclass

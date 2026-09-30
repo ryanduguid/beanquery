@@ -52,9 +52,9 @@ def make(columns):
         if column.datatype in FUNDAMENTAL:
             parts.append(f'self[{i}]')
         elif column.datatype is dict:
-            parts.append(f'*self[{i}].keys(), *self[{i}].values()')
+            parts.append(f'None if self[{i}] is None else frozenset(self[{i}].items())')
         elif column.datatype is set:
-            parts.append(f'*self[{i}]')
+            parts.append(f'None if self[{i}] is None else frozenset(self[{i}])')
         else:
             func = REDUCERS.get(column.datatype, pickle.dumps)
             fname = f'func{i}'
@@ -66,7 +66,7 @@ def make(columns):
     code = textwrap.dedent(f'''
         def create({names}):
             def __hash__(self):
-                return hash(({objs}))
+                return hash(({objs},))
             return __hash__
     ''')
     clsname = f'Hashable[{datatypes}]'
