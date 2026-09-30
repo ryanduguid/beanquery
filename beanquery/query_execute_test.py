@@ -1259,6 +1259,42 @@ class TestExecuteOptions(QueryBase):
                     for row, original in zip(rows, expected):
                         self.assertIs(row[0], original[0])
 
+    def test_distinct_set_iteration_order(self):
+        entries, errors, options = loader.load_string(textwrap.dedent('''
+            2026-01-01 open Assets:Test
+            2026-01-01 open Equity:Test
+            2026-01-02 * "First"
+              Assets:Test 1 AUD
+              Equity:Test -1 AUD
+            2026-01-03 * "Repeated"
+              Assets:Test 2 AUD
+              Equity:Test -2 AUD
+            2026-01-04 * "Empty"
+              Assets:Test 3 AUD
+              Equity:Test -3 AUD
+        '''))
+        self.assertFalse(errors)
+        first = {f'tag{i}' for i in range(32)}
+        repeated = first | {f'discard{i}' for i in range(128)}
+        repeated.difference_update(f'discard{i}' for i in range(128))
+        entries[2] = entries[2]._replace(tags=first, links=first)
+        entries[3] = entries[3]._replace(tags=repeated, links=repeated)
+        ctx = beanquery.connect('beancount:', entries=entries, errors=errors, options=options)
+        for column in ('tags', 'links'):
+            self.assertIs(type(getattr(entries[2], column)), set)
+            self.assertEqual(getattr(entries[2], column), getattr(entries[3], column))
+            self.assertIsNot(getattr(entries[2], column), getattr(entries[3], column))
+            for table in ('postings', 'entries'):
+                with self.subTest(column=column, table=table):
+                    curs = ctx.execute(
+                        f'SELECT DISTINCT 1 AS marker, {column} FROM #{table} WHERE {column} IS NOT NULL')
+                    self.assertEqual(curs.description, (('marker', int), (column, set)))
+                    expected = [(1, getattr(entries[2], column)), (1, getattr(entries[4], column))]
+                    rows = curs.fetchall()
+                    self.assertEqual(rows, expected)
+                    for row, original in zip(rows, expected):
+                        self.assertIs(row[1], original[1])
+
     def test_limit(self):
         self.check_query(
             self.INPUT,

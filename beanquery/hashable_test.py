@@ -38,17 +38,11 @@ class TestHashable(unittest.TestCase):
                 self.assertEqual(hash(wrap(obj)), hash(obj))
 
     def test_set_iteration_order(self):
-        class OrderedSet(set):
-            def __init__(self, values):
-                super().__init__(values)
-                self.order = values
-
-            def __iter__(self):
-                return iter(self.order)
-
         wrap = hashable.make((Column('flag', bool), Column('tags', set)))
-        a = wrap((True, OrderedSet((1, 2))))
-        b = wrap((True, OrderedSet((2, 1))))
+        first = (0, 8)
+        second = (8, 0)
+        a = wrap((True, set(first)))
+        b = wrap((True, set(second)))
         self.assertEqual(a, b)
         self.assertEqual(hash(a), hash(b))
         self.assertEqual(len({a, b}), 1)
