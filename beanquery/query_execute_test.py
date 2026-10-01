@@ -1227,6 +1227,31 @@ class TestExecuteOptions(QueryBase):
                 ('Equity:Rest',),
                 ])
 
+    def test_distinct_sets(self):
+        ledger = """
+          2020-01-01 open Assets:Bank USD
+          2020-01-01 open Expenses:Tests USD
+          2020-01-02 * "First" #alpha #beta ^first ^second
+            Assets:Bank -1 USD
+            Expenses:Tests 1 USD
+          2020-01-03 * "Second" #beta #alpha ^second ^first
+            Assets:Bank -2 USD
+            Expenses:Tests 2 USD
+          2020-01-04 * "Untagged"
+            Assets:Bank -3 USD
+            Expenses:Tests 3 USD
+          2020-01-05 * "Different" #gamma ^third
+            Assets:Bank -4 USD
+            Expenses:Tests 4 USD
+        """
+        for column, expected in [
+                ('tags', [(frozenset({'alpha', 'beta'}),), (frozenset(),), (frozenset({'gamma'}),)]),
+                ('links', [(frozenset({'first', 'second'}),), (frozenset(),), (frozenset({'third'}),)])]:
+            for table in ['postings', 'transactions', 'entries']:
+                with self.subTest(column=column, table=table):
+                    rows = [(None,), *expected] if table == 'entries' else expected
+                    self.check_query(ledger, f'SELECT DISTINCT {column} FROM #{table}', [(column, set)], rows)
+
     def test_limit(self):
         self.check_query(
             self.INPUT,
