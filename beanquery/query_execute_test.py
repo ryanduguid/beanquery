@@ -1274,6 +1274,8 @@ class TestExecuteOptions(QueryBase):
               Equity:Test -3 AUD
         '''))
         self.assertFalse(errors)
+        # Grow and shrink the second set to give equal ordinary sets
+        # different construction histories, which can change their iteration order.
         first = {f'tag{i}' for i in range(32)}
         repeated = first | {f'discard{i}' for i in range(128)}
         repeated.difference_update(f'discard{i}' for i in range(128))
