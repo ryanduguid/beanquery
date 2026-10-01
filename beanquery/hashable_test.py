@@ -43,9 +43,12 @@ class TestHashable(unittest.TestCase):
         second = (8, 0)
         a = wrap((True, set(first)))
         b = wrap((True, set(second)))
+        frozen = (True, frozenset(first))
         self.assertEqual(a, b)
+        self.assertEqual(a, frozen)
         self.assertEqual(hash(a), hash(b))
-        self.assertEqual(len({a, b}), 1)
+        self.assertEqual(hash(a), hash(frozen))
+        self.assertEqual(len({a, b, frozen}), 1)
 
     def test_dict_insertion_order(self):
         wrap = hashable.make((Column('meta', dict),))
