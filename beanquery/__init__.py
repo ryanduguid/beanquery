@@ -52,10 +52,13 @@ class Connection:
         try:
             source = importlib.import_module(source_name)
         except ModuleNotFoundError as exc:
+            # Dotted schemes can fail on a missing parent source package.
+            # Propagate import failures for other modules.
+            missing = exc.name
             missing_source = (
-                exc.name == source_name or
-                (exc.name is not None and exc.name.startswith('beanquery.sources.') and
-                 source_name.startswith(f'{exc.name}.'))
+                missing == source_name or
+                (missing is not None and missing.startswith('beanquery.sources.') and
+                 source_name.startswith(f'{missing}.'))
             )
             if not missing_source:
                 raise
