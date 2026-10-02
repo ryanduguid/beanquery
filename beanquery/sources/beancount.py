@@ -5,7 +5,7 @@ import types as _types
 import typing
 
 from decimal import Decimal
-from functools import lru_cache as cache
+from functools import cached_property, lru_cache as cache
 from urllib.parse import urlparse
 
 from beancount import loader
@@ -174,9 +174,9 @@ class PricesTable(Table):
     datatype = data.Price
     columns = _typed_namedtuple_to_columns(datatype)
 
-    def __init__(self, entries, options):
-        super().__init__(entries, options)
-        self.price_map = prices.build_price_map(entries)
+    @cached_property
+    def price_map(self):
+        return prices.build_price_map(self.entries)
 
 
 class BalancesTable(Table):
@@ -221,8 +221,16 @@ class AccountsTable(tables.Table):
     }
 
     def __init__(self, entries, options):
-        self.accounts = get_account_open_close(entries)
-        self.types = parser.options.get_account_types(options)
+        self.entries = entries
+        self.options = options
+
+    @cached_property
+    def accounts(self):
+        return get_account_open_close(self.entries)
+
+    @cached_property
+    def types(self):
+        return parser.options.get_account_types(self.options)
 
     def __iter__(self):
         return ((name, value[0], value[1]) for name, value in self.accounts.items())
@@ -235,7 +243,11 @@ class CommoditiesTable(tables.Table):
     columns = _typed_namedtuple_to_columns(data.Commodity, {'currency': 'name'})
 
     def __init__(self, entries, options):
-        self.commodities = get_commodity_directives(entries)
+        self.entries = entries
+
+    @cached_property
+    def commodities(self):
+        return get_commodity_directives(self.entries)
 
     def __iter__(self):
         return iter(self.commodities.values())

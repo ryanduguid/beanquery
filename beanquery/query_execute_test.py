@@ -4,6 +4,8 @@ __license__ = "GNU GPLv2"
 import datetime
 import unittest
 import textwrap
+from contextlib import ExitStack
+from unittest import mock
 
 from decimal import Decimal
 from dateutil.relativedelta import relativedelta
@@ -23,6 +25,7 @@ from beanquery import query_compile as qc
 from beanquery import query_execute as qx
 from beanquery import tables
 from beanquery import compiler
+from beanquery.sources import beancount as beancount_source
 
 
 class QueryBase(cmptest.TestCase):
@@ -88,6 +91,80 @@ class CommonInputBase(unittest.TestCase):
       Expenses:Restaurant       -104.00 USD
 
     """)
+
+
+class TestLazyTableData(QueryBase):
+    INPUT = '''
+        option "name_assets" "Resources"
+        2026-01-01 open Resources:Bank USD
+        2026-01-01 open Expenses:Groceries USD
+        2026-01-01 commodity USD
+          name: "US dollar"
+        2026-01-01 commodity TEST
+        2026-01-02 price TEST 10 USD
+        2026-01-03 * "Synthetic merchant"
+          Resources:Bank -1 USD
+          Expenses:Groceries 1 USD
+    '''
+
+    def setUp(self):
+        self.entries, errors, self.options = loader.load_string(textwrap.dedent(self.INPUT))
+        self.assertFalse(errors)
+        stack = ExitStack()
+        self.addCleanup(stack.close)
+        targets = [
+            (beancount_source.prices, 'build_price_map'),
+            (beancount_source, 'get_account_open_close'),
+            (beancount_source, 'get_commodity_directives'),
+            (beancount_source.parser.options, 'get_account_types'),
+        ]
+        self.builders = [stack.enter_context(mock.patch.object(owner, name, wraps=getattr(owner, name)))
+                         for owner, name in targets]
+        self.ctx = beanquery.connect('beancount:', entries=self.entries, errors=errors, options=self.options)
+
+    def test_unused_data(self):
+        self.assertEqual([builder.call_count for builder in self.builders], [0, 0, 0, 0])
+        rows = self.ctx.execute('SELECT account, number FROM #postings').fetchall()
+        self.assertEqual(rows, [('Resources:Bank', D('-1')), ('Expenses:Groceries', D('1'))])
+        self.assertEqual([builder.call_count for builder in self.builders], [0, 0, 0, 0])
+
+    def test_independent_cached_data(self):
+        properties = [('prices', 'price_map'), ('accounts', 'accounts'),
+                      ('commodities', 'commodities'), ('accounts', 'types')]
+        expected = [0, 0, 0, 0]
+        for index, (name, attribute) in enumerate(properties):
+            with self.subTest(attribute=attribute):
+                table = self.ctx.tables[name]
+                value = getattr(table, attribute)
+                self.assertIs(getattr(table, attribute), value)
+                expected[index] = 1
+                self.assertEqual([builder.call_count for builder in self.builders], expected)
+
+    def test_query_results(self):
+        for _ in range(2):
+            self.assertResult("SELECT getprice('TEST', 'USD') LIMIT 1", D('10'))
+            self.assertResult("SELECT open_date('Resources:Bank') LIMIT 1", datetime.date(2026, 1, 1))
+            self.assertResult("SELECT commodity_meta('USD', 'name') LIMIT 1", 'US dollar', object)
+            self.assertResult("SELECT account_sortkey('Resources:Bank') LIMIT 1", '0-Resources:Bank')
+        self.assertEqual([builder.call_count for builder in self.builders], [1, 1, 1, 1])
+
+    def test_reattach(self):
+        table = self.ctx.tables['prices']
+        self.assertResult("SELECT getprice('TEST', 'USD') LIMIT 1", D('10'))
+        entries = [entry._replace(amount=A('20 USD')) if isinstance(entry, beancount_source.data.Price)
+                   else entry for entry in self.entries]
+        self.ctx.attach('beancount:', entries=entries, errors=[], options=self.options)
+        self.assertIsNot(self.ctx.tables['prices'], table)
+        self.assertEqual(self.builders[0].call_count, 1)
+        self.assertResult("SELECT getprice('TEST', 'USD') LIMIT 1", D('20'))
+        self.assertEqual(self.builders[0].call_count, 2)
+        self.assertEqual(beancount_source.prices.get_price(table.price_map, ('TEST', 'USD'))[1], D('10'))
+
+    def test_override(self):
+        replacement = object()
+        self.ctx.tables['prices'].price_map = replacement
+        self.assertIs(self.ctx.tables['prices'].price_map, replacement)
+        self.assertEqual(self.builders[0].call_count, 0)
 
 
 class TestFundamentals(QueryBase):
