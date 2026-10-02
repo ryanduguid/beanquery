@@ -384,6 +384,16 @@ def open_meta(context, account, key=None):
     return open_entry.meta.get(key)
 
 
+# Stub kept only for generating documentation; compilation handles COALESCE.
+@function([types.Any], types.Any)
+def coalesce(*args):
+    """Return the first non-NULL argument, or NULL if all arguments are NULL.
+
+    Accepts one or more arguments. Arguments must have the same type.
+    """
+    raise NotImplementedError
+
+
 # Stub kept only for function type checking and for generating documentation.
 @function([str], object)
 def meta(context, key):

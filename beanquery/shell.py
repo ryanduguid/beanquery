@@ -53,7 +53,7 @@ class style:
         return cls.ESCAPES.sub('', x)
 
 
-def render_location(text, pos, endpos, lineno, indent, strip, out):
+def render_location(text, pos, endpos, lineno, indent, strip, out):  # noqa: PLR0917
     length = endpos - pos
     lines = text.splitlines(True)
     for line in lines[:lineno]:
@@ -374,7 +374,7 @@ class BQLShell(DispatchingShell):
     """An interactive shell interpreter for the Beancount query language."""
     prompt = 'beanquery> '
 
-    def __init__(self, source, outfile, interactive=False, runinit=False, format='text', numberify=False, errors=True):
+    def __init__(self, source, outfile, interactive=False, runinit=False, format='text', numberify=False, errors=True):  # noqa: PLR0917
         settings = Settings(format=format, numberify=numberify)
         super().__init__(outfile, interactive, runinit, settings)
         self.context = beanquery.connect(None)
@@ -705,12 +705,6 @@ def _describe_columns(columns):
 
 def _describe_functions(functions, aggregates=False):
     entries = []
-    if not aggregates:
-        entries.append((
-            'coalesce',
-            'Return the first non-NULL argument, or NULL if all arguments are NULL. '
-            'Arguments must have the same type.',
-            'expr, ...'))
     for name, funcs in functions.items():
         if aggregates != issubclass(funcs[0], query_compile.EvalAggregator):
             continue
@@ -785,7 +779,7 @@ def print_statistics(entries, options, errors, outfile):
 @click.option('--no-errors', '-q', is_flag=True,
               help="Do not report ledger validation errors on load.")
 @click.version_option('', message=f'beanquery {beanquery.__version__}, beancount {beancount.__version__}')
-def main(filename, query, numberify, format, output, no_errors):
+def main(filename, query, numberify, format, output, no_errors):  # noqa: PLR0917
     """An interactive interpreter for the Beancount Query Language.
 
     Load Beancount ledger FILENAME and run Beancount Query Language

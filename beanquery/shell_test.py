@@ -321,9 +321,11 @@ class TestHelp(unittest.TestCase):
             with self.subTest(topic=topic):
                 out, err = run_shell_command('.help ' + topic)
                 self.assertEqual(err, '')
-                self.assertEqual(out.count('coalesce(expr, ...)'), 1)
-                self.assertIn('first non-NULL argument', out)
-                self.assertIn('Arguments must have the same type.', out)
+                self.assertEqual(out.count('coalesce(any)'), 1)
+                description = ' '.join(out.split())
+                self.assertIn('first non-NULL argument', description)
+                self.assertIn('Accepts one or more arguments.', description)
+                self.assertIn('Arguments must have the same type.', description)
                 if topic == 'targets':
                     self.assertNotIn('coalesce', out.split('Aggregate functions')[1])
 
