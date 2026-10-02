@@ -94,6 +94,3 @@ exclude = [
 
 [tool.ruff.lint.per-file-ignores]
 'beanquery/query_env.py' = ['F811']
-# Preserve the established renderer and command signatures.
-'beanquery/query_render.py' = ['PLR0917']
-'beanquery/shell.py' = ['PLR0917']

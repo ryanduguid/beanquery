@@ -486,7 +486,7 @@ def _get_renderer(datatype, ctx):
             return renderer(ctx)
 
 
-def render_text(columns, rows, dcontext, file, expand=False, boxed=False,
+def render_text(columns, rows, dcontext, file, expand=False, boxed=False,  # noqa: PLR0917
                 spaced=False, listsep='  ', nullvalue='', narrow=True, unicode=False, **kwargs):
     """Render the result of executing a query in text format.
 
@@ -552,7 +552,7 @@ def render_text(columns, rows, dcontext, file, expand=False, boxed=False,
     file.write(bottom)
 
 
-def render_csv(columns, rows, dcontext, file, expand=False, nullvalue='', **kwargs):
+def render_csv(columns, rows, dcontext, file, expand=False, nullvalue='', **kwargs):  # noqa: PLR0917
     """Render the result of executing a query in text format.
 
     Args:
