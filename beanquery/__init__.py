@@ -46,7 +46,20 @@ class Connection:
 
     def attach(self, dsn, **kwargs):
         scheme = urlparse(dsn).scheme
-        source = importlib.import_module(f'beanquery.sources.{scheme}')
+        if not scheme:
+            raise OperationalError('missing source scheme')
+        source_name = f'beanquery.sources.{scheme}'
+        try:
+            source = importlib.import_module(source_name)
+        except ModuleNotFoundError as exc:
+            missing_source = (
+                exc.name == source_name or
+                (exc.name is not None and exc.name.startswith('beanquery.sources.') and
+                 source_name.startswith(f'{exc.name}.'))
+            )
+            if not missing_source:
+                raise
+            raise OperationalError(f'unknown source scheme: {scheme!r}') from None
         source.attach(self, dsn, **kwargs)
 
     def close(self):
